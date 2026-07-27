@@ -8,3 +8,10 @@
     </div>
   {% endif %}
 {% endblock %}
+
+{% block object-tools-items %}
+  {{ block.super }}
+  {% if original and original.status != "published" %}
+    <li><a href="#" onclick="document.querySelector('[name=_publish]').click(); return false;">发布此版本</a></li>
+  {% endif %}
+{% endblock %}

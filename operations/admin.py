@@ -69,6 +69,10 @@ class PrivacyPolicyAdmin(admin.ModelAdmin):
         url = reverse("admin:operations_privacypolicy_change", args=(obj.pk,))
         return format_html('<a href="{}">编辑此版本</a>', url)
 
+    def get_urls(self):
+        urls = super().get_urls()
+        return urls
+
 
 @admin.register(EmailTemplate)
 class EmailTemplateAdmin(admin.ModelAdmin):
