@@ -1,0 +1,53 @@
+.richtext-editor {
+  max-width: 980px;
+  background: #fff;
+}
+
+.richtext-editor .ql-editor {
+  min-height: 360px;
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.richtext-editor .ql-editor img {
+  max-width: 100%;
+  height: auto;
+}
+
+.richtext-editor .ql-table-wrapper {
+  overflow-x: auto;
+}
+
+.richtext-source {
+  display: none !important;
+}
+
+.focal-point-preview {
+  position: relative;
+  display: inline-block;
+  max-width: 520px;
+  cursor: crosshair;
+}
+
+.focal-point-preview img {
+  display: block;
+  max-width: 100%;
+}
+
+.focal-point-marker {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: #c41e24;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, .45);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.focal-point-help {
+  margin-top: 6px;
+  color: #666;
+  font-size: 12px;
+}

@@ -1,0 +1,70 @@
+.huali-date-range-split {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+.huali-date-picker {
+    width: 150px !important;
+}
+
+.huali-date-picker .el-input__inner {
+    box-sizing: border-box;
+    height: 32px;
+    padding: 4px 8px 4px 30px;
+    border: 1px solid #dcdfe6;
+    border-radius: 3px;
+    background: #fff;
+    color: #303133;
+    font: 13px/30px Arial, "Microsoft YaHei", sans-serif;
+}
+
+.huali-date-picker .el-input__prefix {
+    top: 0;
+    left: 8px;
+    display: flex;
+    align-items: center;
+    height: 32px;
+    line-height: 32px;
+}
+
+.huali-date-picker .el-input__prefix .el-input__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    line-height: 32px;
+}
+
+.huali-date-picker .el-input__suffix {
+    top: 0;
+    height: 32px;
+}
+
+.huali-date-picker .el-input__suffix .el-input__icon {
+    height: 32px;
+    line-height: 32px;
+}
+
+/* SimpleUI 的原始范围控件始终隐藏，只保留两个独立日历框。 */
+#toolbar .el-date-editor--daterange,
+#toolbar .el-date-editor--datetimerange {
+    display: none !important;
+}
+
+.huali-date-separator {
+    color: #909399;
+    font-size: 14px;
+}
+
+@media (max-width: 900px) {
+    .huali-date-range-split {
+        margin-bottom: 6px;
+    }
+
+    .huali-date-picker {
+        width: 136px !important;
+    }
+}

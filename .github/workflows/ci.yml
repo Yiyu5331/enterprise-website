@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12', cache: pip }
+      - uses: actions/setup-node@v4
+        with: { node-version: '22', cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: pip install -r requirements.txt
+      - run: python manage.py makemigrations --check --dry-run
+      - run: python manage.py check
+      - name: Check production settings
+        env:
+          DJANGO_SECRET_KEY: 'ci-9K2tV7pR4mQ8xL5zN1cB6yH3jD0sA7fU9eG4wZ8nP2r'
+          SITE_DOMAIN: example.com
+          SITE_URL: https://example.com
+          ALLOWED_HOSTS: example.com
+          CSRF_TRUSTED_ORIGINS: https://example.com
+          FORM_SECURITY_KEY: 'ci-form-9K2tV7pR4mQ8xL5zN1cB6yH3jD0sA7fU9eG'
+          BACKUP_ENCRYPTION_KEY: 'ci-backup-9K2tV7pR4mQ8xL5zN1cB6yH'
+          EMAIL_HOST_USER: ci@example.com
+          EMAIL_HOST_PASSWORD: placeholder-only
+          SALES_EMAILS: sales@example.com
+          CLAMAV_ENABLED: 'true'
+        run: python manage.py check --deploy --tag security --settings=huali_website.settings_production
+      - run: python manage.py test
+      - working-directory: frontend
+        run: npm ci && npm run build
+      - run: python manage.py migrate && python manage.py seed_content
+      - working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Playwright prerender smoke test
+        shell: bash
+        run: |
+          python manage.py runserver 127.0.0.1:8000 --noreload >/tmp/huali-django.log 2>&1 &
+          cd frontend
+          npm run preview -- --host 127.0.0.1 --port 4173 >/tmp/huali-vite.log 2>&1 &
+          sleep 5
+          npm run prerender:smoke
+      - run: pip check
+      - run: pip install pip-audit && pip-audit -r requirements.txt
+      - working-directory: frontend
+        run: npm audit --audit-level=high
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

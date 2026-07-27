@@ -1,0 +1,11 @@
+[Unit]
+Description=Incremental Huali prerender
+
+[Service]
+Type=oneshot
+User=www-data
+WorkingDirectory=/srv/huali/current
+EnvironmentFile=/srv/huali/shared/.env
+Environment=DJANGO_SETTINGS_MODULE=huali_website.settings_production
+Environment=PRERENDER_BASE_URL=http://127.0.0.1:4173
+ExecStart=/srv/huali/venv/bin/python manage.py process_prerender_queue

@@ -1,0 +1,18 @@
+[Unit]
+Description=Huali Electric Django Gunicorn
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/srv/huali/current
+EnvironmentFile=/srv/huali/shared/.env
+Environment=DJANGO_SETTINGS_MODULE=huali_website.settings_production
+RuntimeDirectory=huali
+RuntimeDirectoryMode=0755
+ExecStart=/srv/huali/venv/bin/gunicorn huali_website.wsgi:application --bind unix:/run/huali/gunicorn.sock --bind 127.0.0.1:8000 --workers 2 --threads 2 --timeout 60 --access-logfile - --error-logfile -
+Restart=on-failure
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

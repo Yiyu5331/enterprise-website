@@ -1,0 +1,10 @@
+[Unit]
+Description=Process Huali email queue
+
+[Service]
+Type=oneshot
+User=www-data
+WorkingDirectory=/srv/huali/current
+EnvironmentFile=/srv/huali/shared/.env
+Environment=DJANGO_SETTINGS_MODULE=huali_website.settings_production
+ExecStart=/srv/huali/venv/bin/python manage.py process_email_queue

@@ -1,0 +1,12 @@
+{% extends "admin/index.html" %}
+{% block content %}
+<section style="margin-bottom:22px"><h2>系统健康看板</h2><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px">
+<div class="module" style="padding:14px"><strong>邮件队列</strong><p>待发送 {{ health_snapshot.pending_email }} / 失败 {{ health_snapshot.failed_email }}</p></div>
+<div class="module" style="padding:14px"><strong>未解决告警</strong><p>{{ health_snapshot.unresolved_alerts }}</p></div>
+<div class="module" style="padding:14px"><strong>数据库大小</strong><p>{{ health_snapshot.database_size_mb }} MB</p></div>
+<div class="module" style="padding:14px"><strong>磁盘剩余</strong><p>{{ health_snapshot.disk_free_gb }} GB</p></div>
+<div class="module" style="padding:14px"><strong>ClamAV</strong><p>{% if health_snapshot.clamav_enabled %}生产扫描已启用{% else %}开发模式跳过{% endif %}</p></div>
+<div class="module" style="padding:14px"><strong>HTTPS 证书</strong><p>{% if health_snapshot.certificate_days == None %}尚未配置域名{% else %}剩余 {{ health_snapshot.certificate_days }} 天{% endif %}</p></div>
+</div></section>
+{{ block.super }}
+{% endblock %}

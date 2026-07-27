@@ -1,0 +1,9 @@
+{% extends "admin/change_form.html" %}
+{% block object-tools-items %}
+  {% if original %}<li><a href="follow-up/">发送跟进邮件</a></li>{% endif %}
+  {{ block.super }}
+{% endblock %}
+{% block submit_buttons_bottom %}
+  {{ block.super }}
+  {% if original and user.is_superuser %}<p style="margin-top:12px;color:#b42318">物理删除线索时需在删除确认请求中提交确认词 DELETE；日常请使用“无效”状态。</p>{% endif %}
+{% endblock %}

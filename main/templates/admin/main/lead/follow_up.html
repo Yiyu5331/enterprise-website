@@ -1,0 +1,4 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<div id="content-main"><h1>向 {{ lead.contact_name }} 发送跟进邮件</h1><p>邮件会先进入数据库队列，由后台任务发送；SMTP 故障不会影响线索数据。</p><form method="post" enctype="multipart/form-data">{% csrf_token %}{{ form.as_p }}<div class="submit-row"><input type="submit" value="加入发送队列" class="default"></div></form></div>
+{% endblock %}
