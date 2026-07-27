@@ -21,7 +21,7 @@ from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 
 from main.upload_views import richtext_image_upload
-from operations.views import private_inquiry_attachment
+from operations.views import private_inquiry_attachment, security_center
 from operations.redirects import old_news_url, old_product_url
 
 admin.site.site_header = '华丽电器内容管理'
@@ -34,6 +34,7 @@ urlpatterns = [
     path('news/<slug:slug>', old_news_url, name='old-news-url'),
     path('news/<slug:slug>/', old_news_url),
     path('admin/security/', include('operations.urls')),
+    path('admin/security-center/', security_center, name='security-center-shortcut'),
     path('admin/', admin.site.urls),
     path('admin/content-image-upload/<str:kind>/', richtext_image_upload, name='content-image-upload'),
     path('admin/private/inquiries/<int:pk>/attachment/', private_inquiry_attachment, name='admin-private-inquiry-attachment'),

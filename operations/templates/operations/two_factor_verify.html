@@ -1,1 +1,26 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>双重验证</title><style>body{font-family:Arial,"Microsoft YaHei";background:#f3f5f7;color:#222}.panel{max-width:440px;margin:80px auto;background:#fff;padding:32px;border-top:4px solid #c41e24}input,button{box-sizing:border-box;width:100%;padding:11px;margin-top:12px;font-size:16px}button{background:#c41e24;color:#fff;border:0;cursor:pointer}</style></head><body><main class="panel"><h1>双重验证</h1><p>请输入验证器中的 6 位动态验证码，或一次性恢复码。</p>{% for message in messages %}<p>{{ message }}</p>{% endfor %}<form method="post">{% csrf_token %}<input name="token" autocomplete="one-time-code" required autofocus><button type="submit">验证并进入后台</button></form></main></body></html>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>后台安全验证</title>
+  <style>
+    body{font-family:Arial,"Microsoft YaHei";background:#f3f5f7;color:#222}
+    .panel{max-width:440px;margin:80px auto;background:#fff;padding:32px;border-top:4px solid #c41e24}
+    input,button{box-sizing:border-box;width:100%;padding:11px;margin-top:12px;font-size:16px}
+    button{background:#c41e24;color:#fff;border:0;cursor:pointer}
+    .error{color:#c41e24}
+  </style>
+</head>
+<body>
+  <main class="panel">
+    <h1>后台安全验证</h1>
+    <p>请输入验证器中的 6 位动态验证码，或输入尚未使用的一次性恢复码。</p>
+    {% for message in messages %}<p class="error">{{ message }}</p>{% endfor %}
+    <form method="post">
+      {% csrf_token %}
+      <label>验证码或恢复码：<input name="token" autocomplete="one-time-code" required autofocus></label>
+      <button type="submit">验证并进入后台</button>
+    </form>
+  </main>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{% extends "admin/change_form.html" %}
+{% load i18n admin_urls %}
+{% block submit_buttons_bottom %}
+  {{ block.super }}
+  {% if original and original.status != "published" %}
+    <div class="submit-row">
+      <button type="submit" name="_publish" value="1" class="el-button el-button--primary el-button--small" onclick="return confirm('确定保存并发布这份隐私政策吗？发布后该版本不可修改。');">保存并发布</button>
+    </div>
+  {% endif %}
+{% endblock %}

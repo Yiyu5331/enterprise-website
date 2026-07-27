@@ -7,6 +7,7 @@ import qrcode
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.shortcuts import redirect, render
+from axes.models import AccessAttempt, AccessFailureLog, AccessLog
 from django.http import FileResponse, Http404
 from django_otp import login as otp_login
 from django_otp.plugins.otp_totp.models import TOTPDevice
@@ -85,3 +86,15 @@ def private_inquiry_attachment(request, pk):
         raise Http404
     AuditLog.objects.create(actor=request.user, action="private_attachment_download", target_type="inquiry", target_id=str(pk), summary="下载询盘私有附件")
     return FileResponse(inquiry.attachment.open("rb"), as_attachment=True, filename=inquiry.attachment.name.rsplit("/", 1)[-1])
+
+
+@staff_member_required
+def security_center(request):
+    if not request.user.is_superuser:
+        return redirect("admin:index")
+    return render(request, "operations/security_center.html", {
+        "totp_devices": request.user.totpdevice_set.all(),
+        "recent_failures": AccessFailureLog.objects.order_by("-attempt_time")[:10],
+        "recent_attempts": AccessAttempt.objects.order_by("-attempt_time")[:10],
+        "recent_logins": AccessLog.objects.order_by("-attempt_time")[:10],
+    })

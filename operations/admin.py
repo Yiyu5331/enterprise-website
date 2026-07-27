@@ -1,4 +1,8 @@
 from django.contrib import admin
+from django.contrib.admin import helpers
+from django.http import HttpResponseRedirect
+from django.urls import reverse
+from django.utils.html import format_html
 
 from .models import (
     AuditLog, BackupRecord, CaptchaChallenge, EmailAttachment, EmailTask,
@@ -15,6 +19,7 @@ original_index = admin.site.index
 def operations_index(request, extra_context=None):
     context = dict(extra_context or {})
     context["health_snapshot"] = health_snapshot()
+    context["two_factor_setup_url"] = reverse("operations:two-factor-setup")
     return original_index(request, context)
 
 
@@ -24,16 +29,45 @@ admin.site.index_template = "admin/operations_index.html"
 
 @admin.register(PrivacyPolicy)
 class PrivacyPolicyAdmin(admin.ModelAdmin):
-    list_display = ("version", "status", "published_at", "created_at")
+    list_display = ("version", "status", "published_at", "created_at", "edit_link")
     list_filter = ("status",)
     search_fields = ("version", "title_zh", "title_en")
     readonly_fields = ("published_at", "created_at")
+    actions = ("publish_selected", "retire_selected")
+    change_form_template = "admin/operations/privacypolicy/change_form.html"
+
+    def changeform_view(self, request, object_id=None, form_url="", extra_context=None):
+        if request.method == "POST" and "_publish" in request.POST:
+            request.POST = request.POST.copy()
+            request.POST["status"] = PrivacyPolicy.Status.PUBLISHED
+        return super().changeform_view(request, object_id, form_url, extra_context)
+
+    @admin.action(description="发布所选隐私政策（生成正式版本）")
+    def publish_selected(self, request, queryset):
+        count = 0
+        for policy in queryset:
+            if policy.status == PrivacyPolicy.Status.PUBLISHED:
+                continue
+            policy.status = PrivacyPolicy.Status.PUBLISHED
+            policy.save()
+            count += 1
+        self.message_user(request, f"已发布 {count} 个隐私政策版本。")
+
+    @admin.action(description="停用所选隐私政策")
+    def retire_selected(self, request, queryset):
+        updated = queryset.exclude(status=PrivacyPolicy.Status.RETIRED).update(status=PrivacyPolicy.Status.RETIRED)
+        self.message_user(request, f"已停用 {updated} 个隐私政策版本。")
 
     def get_readonly_fields(self, request, obj=None):
         fields = list(super().get_readonly_fields(request, obj))
         if obj and obj.status == PrivacyPolicy.Status.PUBLISHED:
             fields.extend(("version", "title_zh", "body_zh", "title_en", "body_en", "status"))
         return fields
+
+    @admin.display(description="编辑")
+    def edit_link(self, obj):
+        url = reverse("admin:operations_privacypolicy_change", args=(obj.pk,))
+        return format_html('<a href="{}">编辑此版本</a>', url)
 
 
 @admin.register(EmailTemplate)

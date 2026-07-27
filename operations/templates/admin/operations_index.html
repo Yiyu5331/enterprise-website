@@ -1,5 +1,5 @@
 {% extends "admin/index.html" %}
-{% block content %}
+{% block home_content %}
 <section style="margin-bottom:22px"><h2>系统健康看板</h2><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px">
 <div class="module" style="padding:14px"><strong>邮件队列</strong><p>待发送 {{ health_snapshot.pending_email }} / 失败 {{ health_snapshot.failed_email }}</p></div>
 <div class="module" style="padding:14px"><strong>未解决告警</strong><p>{{ health_snapshot.unresolved_alerts }}</p></div>
@@ -8,5 +8,11 @@
 <div class="module" style="padding:14px"><strong>ClamAV</strong><p>{% if health_snapshot.clamav_enabled %}生产扫描已启用{% else %}开发模式跳过{% endif %}</p></div>
 <div class="module" style="padding:14px"><strong>HTTPS 证书</strong><p>{% if health_snapshot.certificate_days == None %}尚未配置域名{% else %}剩余 {{ health_snapshot.certificate_days }} 天{% endif %}</p></div>
 </div></section>
-{{ block.super }}
+{% if request.user.is_superuser %}
+<section class="module" style="margin-bottom:22px;padding:16px">
+<h2>账号安全</h2>
+<p>超级管理员可以绑定验证器双重验证。后台菜单中的“登录保护（Axes）”负责登录失败锁定，“双重验证（OTP-TOTP）”负责动态验证码。</p>
+<a class="button" href="{{ two_factor_setup_url }}">绑定 TOTP 双重验证</a>
+</section>
+{% endif %}
 {% endblock %}

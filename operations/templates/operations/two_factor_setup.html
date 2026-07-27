@@ -1,1 +1,36 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>启用双重验证</title><style>body{font-family:Arial,"Microsoft YaHei";background:#f3f5f7;color:#222}.panel{max-width:640px;margin:48px auto;background:#fff;padding:32px;border-top:4px solid #c41e24}img{width:220px;height:220px}.codes{columns:2;padding:16px;background:#f5f5f5}input,button{padding:10px 12px;font-size:16px}button{background:#c41e24;color:#fff;border:0;cursor:pointer}</style></head><body><main class="panel"><h1>启用双重验证</h1>{% if recovery_codes %}<h2>恢复码仅显示一次</h2><p>请离线保存，丢失全部恢复码后只能在服务器运行重置命令。</p><div class="codes">{% for code in recovery_codes %}<div>{{ code }}</div>{% endfor %}</div><p><a href="{% url 'admin:index' %}">进入后台</a></p>{% else %}<p>使用 Microsoft Authenticator、Google Authenticator 等应用扫描二维码。</p><img src="data:image/png;base64,{{ qr_code }}" alt="TOTP 二维码"><p>手动密钥：<code>{{ secret }}</code></p><form method="post">{% csrf_token %}<label>输入 6 位动态验证码 <input name="token" inputmode="numeric" required></label><button type="submit">确认启用</button></form>{% endif %}</main></body></html>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>绑定双重验证</title>
+  <style>
+    body{font-family:Arial,"Microsoft YaHei";background:#f3f5f7;color:#222}
+    .panel{max-width:640px;margin:48px auto;background:#fff;padding:32px;border-top:4px solid #c41e24}
+    img{width:220px;height:220px;display:block;margin:18px 0}
+    .codes{columns:2;padding:16px;background:#f5f5f5;line-height:2}
+    input,button{padding:10px 12px;font-size:16px}
+    button{background:#c41e24;color:#fff;border:0;cursor:pointer}
+    .help{color:#555;line-height:1.8}
+  </style>
+</head>
+<body>
+  <main class="panel">
+    <h1>绑定验证器双重验证</h1>
+    {% if recovery_codes %}
+      <h2>恢复码仅显示一次</h2>
+      <p class="help">请把下面 10 个恢复码离线保存。每个恢复码只能使用一次，全部丢失后只能在服务器终端执行重置命令。</p>
+      <div class="codes">{% for code in recovery_codes %}<div>{{ code }}</div>{% endfor %}</div>
+      <p><a href="{% url 'admin:index' %}">返回后台首页</a></p>
+    {% else %}
+      <p class="help">第 1 步：在手机安装 Microsoft Authenticator 或 Google Authenticator。<br>第 2 步：扫描下面二维码。<br>第 3 步：输入手机应用显示的 6 位验证码完成绑定。</p>
+      <img src="data:image/png;base64,{{ qr_code }}" alt="验证器二维码">
+      <p>无法扫描时，可手动输入密钥：<code>{{ secret }}</code></p>
+      <form method="post">
+        {% csrf_token %}
+        <label>6 位动态验证码：<input name="token" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" required></label>
+        <button type="submit">确认绑定</button>
+      </form>
+    {% endif %}
+  </main>
+</body>
+</html>

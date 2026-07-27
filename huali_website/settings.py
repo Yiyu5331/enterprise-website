@@ -42,8 +42,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'drf_spectacular',
     'django_otp',
-    'django_otp.plugins.otp_totp',
-    'axes',
+    'operations.third_party_apps.ChineseTotpConfig',
+    'operations.third_party_apps.ChineseAxesConfig',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -152,6 +152,28 @@ SIMPLEUI_LOGO = '/static/images/logo.jpg'  # 后台 logo（后续替换）
 SIMPLEUI_DEFAULT_THEME = 'e-blue.css'      # 默认主题：蓝色
 
 SIMPLEUI_HOME_TITLE = '华丽电器内容管理'
+SIMPLEUI_CONFIG = {
+    # 保留 Django 自动生成的模型菜单，同时补充一个直达安全设置的入口。
+    'system_keep': True,
+    'menus': [
+        {
+            'name': '账号安全（TOTP）',
+            'icon': 'fas fa-user-shield',
+            'models': [
+                {
+                    'name': '绑定验证器双重验证',
+                    'icon': 'fas fa-mobile-alt',
+                    'url': '/admin/security/two-factor/setup/',
+                },
+                {
+                    'name': '安全状态与登录记录',
+                    'icon': 'fas fa-shield-alt',
+                    'url': '/admin/security-center/',
+                },
+            ],
+        },
+    ],
+}
 
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',

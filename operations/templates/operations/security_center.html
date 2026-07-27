@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>账号安全（TOTP）</title>
+  <style>
+    body{font-family:Arial,"Microsoft YaHei";background:#f3f5f7;color:#222;margin:0}
+    .wrap{max-width:1100px;margin:24px auto;padding:0 18px}
+    .panel{background:#fff;padding:22px;margin-bottom:18px;border-top:4px solid #c41e24}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+    .item{border:1px solid #e2e2e2;padding:12px;overflow-wrap:anywhere}
+    table{width:100%;border-collapse:collapse;font-size:14px}
+    th,td{border-bottom:1px solid #eee;text-align:left;padding:9px;vertical-align:top}
+    .muted{color:#666;line-height:1.7}
+    .btn{display:inline-block;background:#c41e24;color:#fff;text-decoration:none;padding:10px 14px}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="panel">
+      <h1>账号安全（TOTP）</h1>
+      <p class="muted">TOTP 是手机验证器生成的动态验证码。登录保护（Axes）会记录异常登录并在失败次数过多时暂时锁定账号。</p>
+      <a class="btn" href="{% url 'operations:two-factor-setup' %}">绑定验证器双重验证</a>
+    </section>
+    <section class="panel">
+      <h2>双重验证设备（OTP-TOTP）</h2>
+      <div class="grid">
+        {% for device in totp_devices %}
+          <div class="item">设备名称：{{ device.name }}<br>状态：{% if device.confirmed %}已启用{% else %}未完成绑定{% endif %}<br>最近使用：{{ device.last_used_at|default:'暂无记录' }}</div>
+        {% empty %}
+          <div class="item">目前还没有绑定验证器。</div>
+        {% endfor %}
+      </div>
+    </section>
+    <section class="panel">
+      <h2>登录失败记录（Axes）</h2>
+      <table><tr><th>时间</th><th>用户名</th><th>IP</th><th>是否锁定</th></tr>
+      {% for item in recent_failures %}<tr><td>{{ item.attempt_time }}</td><td>{{ item.username }}</td><td>{{ item.ip_address }}</td><td>{{ item.locked_out|yesno:'是,否' }}</td></tr>{% empty %}<tr><td colspan="4">暂无登录失败记录</td></tr>{% endfor %}</table>
+    </section>
+    <section class="panel">
+      <h2>安全登录记录</h2>
+      <table><tr><th>时间</th><th>类型</th><th>用户名</th><th>访问路径</th></tr>
+      {% for item in recent_logins %}<tr><td>{{ item.attempt_time }}</td><td>登录记录</td><td>{{ item.username }}</td><td>{{ item.path_info }}</td></tr>{% empty %}<tr><td colspan="4">暂无登录记录</td></tr>{% endfor %}</table>
+    </section>
+  </main>
+</body>
+</html>
