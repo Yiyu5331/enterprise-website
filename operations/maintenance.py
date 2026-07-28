@@ -5,7 +5,7 @@ from django.utils import timezone
 from main.models import LeadStatus, Lianxi, Xunpan
 
 from .backup import cleanup_old_backups
-from .models import AuditLog, CaptchaChallenge, FormToken, PrerenderTask
+from .models import AuditLog, CaptchaChallenge, FormToken, PrerenderTask, SystemAlert, TaskRun
 
 
 def anonymize_old_leads():
@@ -54,3 +54,22 @@ def cleanup_expired_data():
     AuditLog.objects.filter(created_at__lt=now - timedelta(days=365 * 3)).delete()
     PrerenderTask.objects.filter(pending=False, updated_at__lt=now - timedelta(days=30)).delete()
     cleanup_old_backups(30)
+
+
+def recover_stale_task_runs(max_age=timedelta(hours=2)):
+    """将异常中断后遗留的运行中任务收敛为失败，避免后台状态永久卡住。"""
+    cutoff = timezone.now() - max_age
+    stale_runs = TaskRun.objects.filter(status="running", started_at__lt=cutoff)
+    recovered = 0
+    for run in stale_runs:
+        run.status = "failed"
+        run.summary = "任务超过 2 小时未结束，已自动标记为失败。"
+        run.finished_at = timezone.now()
+        run.save(update_fields=("status", "summary", "finished_at"))
+        SystemAlert.objects.create(
+            level="error",
+            source="task_run",
+            message=f"任务运行记录 {run.pk}（{run.kind}）疑似异常中断，已标记为失败。",
+        )
+        recovered += 1
+    return recovered

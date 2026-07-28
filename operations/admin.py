@@ -13,6 +13,7 @@ from .health import health_snapshot
 from .signals import DEFAULT_TEMPLATES
 from .emailing import create_email_task
 from . import security_admin  # noqa: F401
+from main.admin_filters import DefaultDateRangeAdminMixin
 
 original_index = admin.site.index
 
@@ -29,9 +30,10 @@ admin.site.index_template = "admin/operations_index.html"
 
 
 @admin.register(PrivacyPolicy)
-class PrivacyPolicyAdmin(admin.ModelAdmin):
+class PrivacyPolicyAdmin(DefaultDateRangeAdminMixin, admin.ModelAdmin):
+    date_range_field = "created_at"
     list_display = ("version", "status", "published_at", "created_at", "edit_link")
-    list_filter = ("status",)
+    list_filter = ("status", "created_at")
     search_fields = ("version", "title_zh", "title_en")
     readonly_fields = ("published_at", "created_at")
     actions = ("publish_selected", "retire_selected")
@@ -76,9 +78,10 @@ class PrivacyPolicyAdmin(admin.ModelAdmin):
 
 
 @admin.register(EmailTemplate)
-class EmailTemplateAdmin(admin.ModelAdmin):
+class EmailTemplateAdmin(DefaultDateRangeAdminMixin, admin.ModelAdmin):
+    date_range_field = "updated_at"
     list_display = ("name", "key", "is_active", "updated_at")
-    list_filter = ("is_active",)
+    list_filter = ("is_active", "updated_at")
     search_fields = ("name", "key", "subject")
     readonly_fields = ("key", "allowed_variables", "updated_at")
     actions = ("restore_defaults", "send_test_email")
@@ -129,7 +132,8 @@ class EmailAttachmentInline(admin.TabularInline):
 
 
 @admin.register(EmailTask)
-class EmailTaskAdmin(admin.ModelAdmin):
+class EmailTaskAdmin(DefaultDateRangeAdminMixin, admin.ModelAdmin):
+    date_range_field = "created_at"
     list_display = ("subject", "kind", "recipient_preview", "status", "attempts", "sent_at", "created_at")
     list_filter = ("kind", "status", "created_at")
     search_fields = ("subject", "recipients", "last_error")
@@ -159,7 +163,8 @@ class ReadOnlyAdmin(admin.ModelAdmin):
 
 
 @admin.register(AuditLog)
-class AuditLogAdmin(ReadOnlyAdmin):
+class AuditLogAdmin(DefaultDateRangeAdminMixin, ReadOnlyAdmin):
+    date_range_field = "created_at"
     list_display = ("created_at", "actor", "action", "target_type", "target_id", "summary")
     list_filter = ("action", "created_at")
     search_fields = ("actor__username", "action", "target_type", "target_id", "summary")
@@ -167,30 +172,34 @@ class AuditLogAdmin(ReadOnlyAdmin):
 
 
 @admin.register(TaskRun)
-class TaskRunAdmin(ReadOnlyAdmin):
+class TaskRunAdmin(DefaultDateRangeAdminMixin, ReadOnlyAdmin):
+    date_range_field = "started_at"
     list_display = ("kind", "status", "summary", "started_at", "finished_at")
-    list_filter = ("kind", "status")
+    list_filter = ("kind", "status", "started_at")
     readonly_fields = tuple(field.name for field in TaskRun._meta.fields)
 
 
 @admin.register(SystemAlert)
-class SystemAlertAdmin(admin.ModelAdmin):
+class SystemAlertAdmin(DefaultDateRangeAdminMixin, admin.ModelAdmin):
+    date_range_field = "created_at"
     list_display = ("level", "source", "message", "resolved_at", "created_at")
-    list_filter = ("level", "source", "resolved_at")
+    list_filter = ("level", "source", "created_at")
     readonly_fields = ("level", "source", "message", "created_at")
 
 
 @admin.register(PrerenderTask)
-class PrerenderTaskAdmin(ReadOnlyAdmin):
+class PrerenderTaskAdmin(DefaultDateRangeAdminMixin, ReadOnlyAdmin):
+    date_range_field = "updated_at"
     list_display = ("path", "reason", "pending", "updated_at")
-    list_filter = ("pending",)
+    list_filter = ("pending", "updated_at")
     readonly_fields = tuple(field.name for field in PrerenderTask._meta.fields)
 
 
 @admin.register(BackupRecord)
-class BackupRecordAdmin(ReadOnlyAdmin):
+class BackupRecordAdmin(DefaultDateRangeAdminMixin, ReadOnlyAdmin):
+    date_range_field = "created_at"
     list_display = ("filename", "size", "status", "remote_uploaded", "created_at")
-    list_filter = ("status", "remote_uploaded")
+    list_filter = ("status", "remote_uploaded", "created_at")
     readonly_fields = tuple(field.name for field in BackupRecord._meta.fields)
 
 

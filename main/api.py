@@ -15,6 +15,7 @@ from rest_framework.decorators import api_view
 from rest_framework.exceptions import APIException, NotFound, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import exception_handler
+from drf_spectacular.utils import extend_schema
 
 from main.content_utils import ContentStatus
 from main.models import Lianxi, Xunpan
@@ -357,6 +358,7 @@ def validate_filters(request, categories):
     return category, q
 
 
+@extend_schema(operation_id="product_categories_list")
 @api_view(["GET"])
 def product_categories(request):
     queryset = (
@@ -368,6 +370,8 @@ def product_categories(request):
     return Response(ProductCategorySerializer(queryset, many=True, context={"request": request}).data)
 
 
+@extend_schema(operation_id="products_list")
+@extend_schema(operation_id="products_list", responses=ProductCardSerializer(many=True))
 @api_view(["GET"])
 def product_list(request):
     category_slugs = set(ProductCategory.objects.filter(is_active=True).values_list("slug", flat=True))
@@ -384,6 +388,7 @@ def product_list(request):
     return paginator.response(request, data)
 
 
+@extend_schema(operation_id="product_detail")
 @api_view(["GET"])
 def product_detail(request, model):
     normalized = normalize_model(model)
@@ -393,12 +398,14 @@ def product_detail(request, model):
     return Response(ProductDetailSerializer(product, context={"request": request}).data)
 
 
+@extend_schema(operation_id="product_options_list")
 @api_view(["GET"])
 def product_options(request):
     queryset = published_products().order_by("category__sort_order", "sort_order", "id")
     return Response(ProductOptionSerializer(queryset, many=True, context={"request": request}).data)
 
 
+@extend_schema(operation_id="news_categories_list")
 @api_view(["GET"])
 def news_categories(request):
     queryset = (
@@ -410,6 +417,8 @@ def news_categories(request):
     return Response(NewsCategorySerializer(queryset, many=True).data)
 
 
+@extend_schema(operation_id="news_list")
+@extend_schema(operation_id="news_list", responses=NewsCardSerializer(many=True))
 @api_view(["GET"])
 def news_list(request):
     category_slugs = set(NewsCategory.objects.filter(is_active=True).values_list("slug", flat=True))
@@ -425,6 +434,7 @@ def news_list(request):
     return paginator.response(request, data)
 
 
+@extend_schema(operation_id="news_detail")
 @api_view(["GET"])
 def news_detail(request, slug):
     article = published_articles().filter(slug=slug).first()

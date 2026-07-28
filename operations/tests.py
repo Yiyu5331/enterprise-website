@@ -17,8 +17,8 @@ from news.models import Article, NewsCategory
 from .attachments import AttachmentScanUnavailable, validate_and_scan_attachment
 from .backup import create_backup, verify_and_extract_backup
 from .mail_queue import process_one
-from .maintenance import anonymize_old_leads
-from .models import AuditLog, EmailTask, FormToken, PrivacyPolicy
+from .maintenance import anonymize_old_leads, recover_stale_task_runs
+from .models import AuditLog, EmailTask, FormToken, PrivacyPolicy, SystemAlert, TaskRun
 
 
 class SecureFormTests(TestCase):
@@ -159,6 +159,20 @@ class RetentionTests(TestCase):
         self.assertEqual(lead.contact_name, "已匿名化")
         self.assertTrue(lead.anonymized_at)
         self.assertTrue(AuditLog.objects.filter(action="lead_anonymized").exists())
+
+
+class TaskRecoveryTests(TestCase):
+    def test_stale_running_task_is_marked_failed(self):
+        task = TaskRun.objects.create(
+            kind="backup",
+            status="running",
+            started_at=timezone.now() - timedelta(hours=3),
+        )
+        self.assertEqual(recover_stale_task_runs(), 1)
+        task.refresh_from_db()
+        self.assertEqual(task.status, "failed")
+        self.assertIsNotNone(task.finished_at)
+        self.assertTrue(SystemAlert.objects.filter(source="task_run").exists())
 
 
 class BackupTests(TestCase):
