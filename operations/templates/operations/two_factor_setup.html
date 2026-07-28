@@ -16,7 +16,12 @@
 <body>
   <main class="panel">
     <h1>绑定验证器双重验证</h1>
-    {% if recovery_codes %}
+    {% if already_bound %}
+      <h2>验证器已绑定（Authenticator already bound）</h2>
+      <p class="help">当前管理员账号已经完成双重验证绑定，无需重复绑定。你可以从“账号安全（TOTP）”查看设备状态和登录记录。</p>
+      <p><a href="{% url 'operations:security-center' %}">查看账号安全（Security center）</a></p>
+      <p><a href="{% url 'admin:index' %}">返回后台首页（Back to admin）</a></p>
+    {% elif recovery_codes %}
       <h2>恢复码仅显示一次</h2>
       <p class="help">请把下面 10 个恢复码离线保存。每个恢复码只能使用一次，全部丢失后只能在服务器终端执行重置命令。</p>
       <div class="codes">{% for code in recovery_codes %}<div>{{ code }}</div>{% endfor %}</div>

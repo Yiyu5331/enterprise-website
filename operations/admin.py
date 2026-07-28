@@ -12,6 +12,7 @@ from .models import (
 from .health import health_snapshot
 from .signals import DEFAULT_TEMPLATES
 from .emailing import create_email_task
+from . import security_admin  # noqa: F401
 
 original_index = admin.site.index
 

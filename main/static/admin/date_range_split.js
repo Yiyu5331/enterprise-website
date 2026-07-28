@@ -1,9 +1,23 @@
 (function () {
     "use strict";
 
-    function formatDate(value, endOfDay) {
+    function dateOnly(value) {
+        return (value || "").slice(0, 10);
+    }
+
+    function queryDate(value, isEnd) {
         if (!value) return "";
-        return value + (endOfDay ? " 23:59:59" : " 00:00:00");
+        return value + (isEnd ? " 23:59:59" : " 00:00:00");
+    }
+
+    function createDateInput(label, value) {
+        var input = document.createElement("input");
+        input.type = "date";
+        input.className = "huali-date-picker";
+        input.setAttribute("aria-label", label);
+        input.title = label;
+        input.value = value;
+        return input;
     }
 
     function splitDateRanges() {
@@ -28,41 +42,26 @@
             });
             if (!startHidden || !endHidden) return;
 
-            var startValue = (startHidden.value || "").slice(0, 10);
-            var endValue = (endHidden.value || "").slice(0, 10);
             var wrapper = document.createElement("span");
             wrapper.className = "huali-date-range-split";
-            wrapper.innerHTML = [
-                '<el-date-picker class="huali-date-picker" v-model="start"',
-                ' type="date" value-format="yyyy-MM-dd" format="yyyy-MM-dd"',
-                ' placeholder="开始日期" clearable></el-date-picker>',
-                '<span class="huali-date-separator">-</span>',
-                '<el-date-picker class="huali-date-picker" v-model="end"',
-                ' type="date" value-format="yyyy-MM-dd" format="yyyy-MM-dd"',
-                ' placeholder="截止日期" clearable></el-date-picker>'
-            ].join("");
+            var startInput = createDateInput("开始日期", dateOnly(startHidden.value));
+            var endInput = createDateInput("截止日期", dateOnly(endHidden.value));
+            var separator = document.createElement("span");
+            separator.className = "huali-date-separator";
+            separator.textContent = "-";
+            wrapper.append(startInput, separator, endInput);
             picker.parentNode.insertBefore(wrapper, picker);
             picker.style.display = "none";
 
-            // 使用独立 Vue 实例，让两个日历选择器分别维护自己的日期。
-            new Vue({
-                el: wrapper,
-                data: {
-                    start: startValue,
-                    end: endValue
-                },
-                watch: {
-                    start: function (value) {
-                        startHidden.value = formatDate(value, false);
-                    },
-                    end: function (value) {
-                        endHidden.value = formatDate(value, true);
-                    }
-                }
+            startInput.addEventListener("change", function () {
+                startHidden.value = queryDate(startInput.value, false);
+            });
+            endInput.addEventListener("change", function () {
+                endHidden.value = queryDate(endInput.value, true);
             });
 
-            startHidden.value = formatDate(startValue, false);
-            endHidden.value = formatDate(endValue, true);
+            startHidden.value = queryDate(startInput.value, false);
+            endHidden.value = queryDate(endInput.value, true);
         });
 
         toolbar.dataset.dateRangesReady = "true";
@@ -70,7 +69,6 @@
 
     function boot() {
         splitDateRanges();
-        if (!document.getElementById("toolbar") || document.querySelector(".huali-date-range-split")) return;
         window.setTimeout(splitDateRanges, 100);
         window.setTimeout(splitDateRanges, 500);
         window.setTimeout(splitDateRanges, 1200);

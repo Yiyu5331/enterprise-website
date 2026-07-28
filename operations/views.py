@@ -25,10 +25,9 @@ def two_factor_setup(request):
     if not request.user.is_superuser:
         return redirect("admin:index")
     device, _ = TOTPDevice.objects.get_or_create(user=request.user, name="default", defaults={"confirmed": False})
-    if device.confirmed:
-        return redirect("admin:index")
+    already_bound = device.confirmed
     recovery_codes = None
-    if request.method == "POST" and device.verify_token(request.POST.get("token", "").strip()):
+    if request.method == "POST" and not already_bound and device.verify_token(request.POST.get("token", "").strip()):
         device.confirmed = True
         device.save(update_fields=("confirmed",))
         RecoveryCode.objects.filter(user=request.user).delete()
@@ -38,7 +37,7 @@ def two_factor_setup(request):
         ])
         otp_login(request, device)
         AuditLog.objects.create(actor=request.user, action="totp_enabled", target_type="user", target_id=str(request.user.pk), summary="超级管理员启用双重验证")
-    elif request.method == "POST":
+    elif request.method == "POST" and not already_bound:
         messages.error(request, "验证码不正确，请确认手机时间准确后重试。")
 
     image = qrcode.make(device.config_url)
@@ -48,6 +47,7 @@ def two_factor_setup(request):
         "qr_code": base64.b64encode(output.getvalue()).decode("ascii"),
         "secret": device.key,
         "recovery_codes": recovery_codes,
+        "already_bound": already_bound,
     })
 
 
