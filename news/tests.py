@@ -1,9 +1,10 @@
 import tempfile
 
+from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.test import TestCase, override_settings
 
-from main.content_utils import ContentStatus, sanitize_rich_text
+from main.content_utils import ContentStatus, VerificationStatus, sanitize_rich_text
 
 from .models import Article, NewsCategory
 
@@ -62,3 +63,34 @@ class NewsApiTests(TestCase):
 
         self.assertNotIn("<script", cleaned)
         self.assertNotIn("http://bad.test", cleaned)
+
+    @override_settings(SITE_CONTENT_MODE="production")
+    def test_production_mode_rejects_demo_article_publish(self):
+        category = NewsCategory.objects.create(name="测试新闻", slug="test-news")
+        article = Article(
+            category=category,
+            title="演示新闻",
+            slug="demo-test-news",
+            body="<p>测试正文</p>",
+            status=ContentStatus.PUBLISHED,
+            is_demo=True,
+            verification_status=VerificationStatus.PENDING,
+        )
+
+        with self.assertRaisesMessage(ValidationError, "生产模式不能发布演示内容"):
+            article.full_clean()
+
+    @override_settings(SITE_CONTENT_MODE="production")
+    def test_production_api_hides_demo_article_and_empty_category(self):
+        category = NewsCategory.objects.create(name="演示新闻", slug="demo-news")
+        Article.objects.create(
+            category=category,
+            title="演示新闻",
+            slug="demo-hidden-news",
+            body="<p>测试正文</p>",
+            status=ContentStatus.PUBLISHED,
+            is_demo=True,
+        )
+
+        self.assertEqual(self.client.get("/api/v1/news/").json()["count"], 0)
+        self.assertEqual(self.client.get("/api/v1/news-categories/").json(), [])

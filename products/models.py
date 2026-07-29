@@ -3,14 +3,17 @@ import re
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 
 from main.content_utils import (
     ContentStatus,
+    VerificationStatus,
     delete_field_file,
     process_uploaded_image,
     rich_text_to_plain,
     rich_text_images_have_alt,
     sanitize_rich_text,
+    validate_production_publish,
     validate_image_upload,
     validate_pdf_upload,
 )
@@ -166,6 +169,14 @@ class Product(ProcessedProductImageMixin):
     is_featured = models.BooleanField("首页推荐", default=False)
     featured_order = models.PositiveIntegerField("推荐排序", default=0)
     homepage_badge = models.CharField("首页角标", max_length=20, blank=True)
+    is_demo = models.BooleanField("演示产品", default=False, db_index=True)
+    verification_status = models.CharField(
+        "核验状态", max_length=20, choices=VerificationStatus.choices,
+        default=VerificationStatus.PENDING, db_index=True,
+    )
+    source_name = models.CharField("资料来源名称", max_length=200, blank=True)
+    source_url = models.URLField("资料来源网址", blank=True)
+    verified_at = models.DateTimeField("核验时间", null=True, blank=True)
     seo_title = models.CharField("SEO 标题", max_length=160, blank=True)
     seo_description = models.CharField("SEO 描述", max_length=300, blank=True)
     search_text = models.TextField("搜索索引", blank=True, editable=False)
@@ -212,6 +223,10 @@ class Product(ProcessedProductImageMixin):
         return re.sub(r"[\s-]+", "", self.model).lower()
 
     def clean(self):
+        validate_production_publish(
+            status=self.status, is_demo=self.is_demo,
+            verification_status=self.verification_status,
+        )
         if self.pk:
             old = type(self).objects.filter(pk=self.pk).values("model", "first_published_at").first()
             if old and old["first_published_at"] and old["model"] != self.model:
@@ -249,6 +264,12 @@ class Product(ProcessedProductImageMixin):
             raise ValidationError("；".join(errors) + "。")
 
     def save(self, *args, **kwargs):
+        if self.verification_status == VerificationStatus.VERIFIED and not self.verified_at:
+            self.verified_at = timezone.now()
+        elif self.verification_status != VerificationStatus.VERIFIED:
+            self.verified_at = None
+        if kwargs.get("update_fields") is not None and "verification_status" in kwargs["update_fields"]:
+            kwargs["update_fields"] = set(kwargs["update_fields"]) | {"verified_at"}
         self.description = sanitize_rich_text(self.description)
         self.description_text = rich_text_to_plain(self.description)
         super().save(*args, **kwargs)
@@ -294,6 +315,15 @@ class ProductSpecification(models.Model):
     value = models.CharField("参数值", max_length=150)
     show_on_card = models.BooleanField("卡片展示", default=False)
     sort_order = models.PositiveIntegerField("排序", default=0)
+    standard_parameter = models.ForeignKey(
+        "StandardParameter", verbose_name="标准参数", related_name="product_values",
+        null=True, blank=True, on_delete=models.SET_NULL,
+    )
+    normalized_number = models.DecimalField(
+        "标准数值", max_digits=18, decimal_places=6, null=True, blank=True,
+        help_text="用于单位归一化比较，不改变前台展示的原始值。",
+    )
+    normalized_text = models.CharField("标准文本值", max_length=150, blank=True)
 
     class Meta:
         verbose_name = "产品参数"
@@ -302,6 +332,96 @@ class ProductSpecification(models.Model):
 
     def __str__(self):
         return f"{self.name}: {self.value}"
+
+
+class StandardParameter(models.Model):
+    class ValueType(models.TextChoices):
+        NUMBER = "number", "数值"
+        ENUM = "enum", "枚举"
+        TEXT = "text", "文本"
+        BOOLEAN = "boolean", "是/否"
+
+    name_zh = models.CharField("中文名称", max_length=100, unique=True)
+    name_en = models.CharField("英文名称", max_length=100, blank=True)
+    slug = models.SlugField("固定 slug", max_length=100, unique=True)
+    value_type = models.CharField("数据类型", max_length=20, choices=ValueType.choices, default=ValueType.NUMBER)
+    standard_unit = models.CharField("标准单位", max_length=30, blank=True)
+    aliases_zh = models.TextField("中文别名", blank=True, help_text="每行一个别名。")
+    aliases_en = models.TextField("英文别名", blank=True, help_text="每行一个别名。")
+    sort_order = models.PositiveIntegerField("排序", default=0)
+    is_active = models.BooleanField("启用", default=True)
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+    updated_at = models.DateTimeField("更新时间", auto_now=True)
+
+    class Meta:
+        verbose_name = "标准参数字典"
+        verbose_name_plural = "标准参数字典"
+        ordering = ("sort_order", "id")
+
+    def __str__(self):
+        return self.name_zh
+
+
+class StandardParameterOption(models.Model):
+    parameter = models.ForeignKey(StandardParameter, verbose_name="标准参数", related_name="options", on_delete=models.CASCADE)
+    value = models.SlugField("标准值", max_length=80)
+    label_zh = models.CharField("中文显示", max_length=100)
+    label_en = models.CharField("英文显示", max_length=100, blank=True)
+    aliases = models.TextField("别名", blank=True, help_text="每行一个中英文别名。")
+    sort_order = models.PositiveIntegerField("排序", default=0)
+
+    class Meta:
+        verbose_name = "标准参数枚举值"
+        verbose_name_plural = "标准参数枚举值"
+        ordering = ("sort_order", "id")
+        constraints = [models.UniqueConstraint(fields=("parameter", "value"), name="unique_standard_parameter_option")]
+
+    def __str__(self):
+        return f"{self.parameter}: {self.label_zh}"
+
+
+class ParameterMappingSuggestion(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "待确认"
+        ACCEPTED = "accepted", "已接受"
+        REJECTED = "rejected", "已拒绝"
+
+    source_name = models.CharField("原参数名称", max_length=100, db_index=True)
+    suggested_parameter = models.ForeignKey(
+        StandardParameter,
+        verbose_name="建议标准参数",
+        related_name="mapping_suggestions",
+        on_delete=models.CASCADE,
+    )
+    matched_alias = models.CharField("命中的名称/别名", max_length=100)
+    confidence = models.DecimalField("建议置信度", max_digits=4, decimal_places=3, default=1)
+    affected_count = models.PositiveIntegerField("待映射参数数", default=0)
+    status = models.CharField("确认状态", max_length=20, choices=Status.choices, default=Status.PENDING)
+    review_notes = models.CharField("审核备注", max_length=300, blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="审核人",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    reviewed_at = models.DateTimeField("审核时间", null=True, blank=True)
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+    updated_at = models.DateTimeField("更新时间", auto_now=True)
+
+    class Meta:
+        verbose_name = "参数映射建议"
+        verbose_name_plural = "参数映射建议"
+        ordering = ("status", "source_name", "id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("source_name", "suggested_parameter"),
+                name="unique_parameter_mapping_suggestion",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.source_name} -> {self.suggested_parameter.name_zh}"
 
 
 class ProductHighlight(models.Model):
@@ -356,6 +476,8 @@ class ProductDocument(models.Model):
     document_type = models.CharField("资料类型", max_length=30, choices=DocumentType.choices)
     language = models.CharField("语言", max_length=20, choices=Language.choices, default=Language.ZH)
     file = models.FileField("PDF 文件", upload_to="products/documents/", validators=[validate_pdf_upload])
+    is_demo = models.BooleanField("演示资料", default=False, db_index=True)
+    disclaimer = models.CharField("测试免责声明", max_length=300, blank=True)
     sort_order = models.PositiveIntegerField("排序", default=0)
 
     class Meta:

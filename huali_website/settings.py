@@ -32,6 +32,9 @@ DEBUG = os.getenv("DJANGO_DEBUG", "true").lower() == "true"
 ALLOWED_HOSTS = [item.strip() for item in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if item.strip()]
 SITE_URL = os.getenv("SITE_URL", "http://localhost:5173").rstrip("/")
 SITE_DOMAIN = os.getenv("SITE_DOMAIN", "localhost")
+SITE_CONTENT_MODE = os.getenv("SITE_CONTENT_MODE", "test").strip().lower()
+if SITE_CONTENT_MODE not in {"test", "production"}:
+    raise ValueError("SITE_CONTENT_MODE 只能是 test 或 production。")
 SQLITE_BUSY_TIMEOUT_MS = int(os.getenv("SQLITE_BUSY_TIMEOUT_MS", "5000"))
 
 
@@ -52,6 +55,9 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'products.apps.ProductsConfig',
     'news.apps.NewsConfig',
+    'company_content.apps.CompanyContentConfig',
+    'honors.apps.HonorsConfig',
+    'page_builder.apps.PageBuilderConfig',
     'main.apps.MainConfig',
     'operations.apps.OperationsConfig',
 ]
@@ -223,6 +229,9 @@ REQUIRE_SUPERUSER_2FA = os.getenv("REQUIRE_SUPERUSER_2FA", "false").lower() == "
 BAIDU_SITE = os.getenv("BAIDU_SITE", "")
 BAIDU_TOKEN = os.getenv("BAIDU_TOKEN", "")
 INDEXNOW_KEY = os.getenv("INDEXNOW_KEY", "")
+IMAGE_API_URL = os.getenv("IMAGE_API_URL", "")
+IMAGE_API_KEY = os.getenv("IMAGE_API_KEY", "")
+IMAGE_API_MODEL = os.getenv("IMAGE_API_MODEL", "gpt-image-2")
 
 SPECTACULAR_SETTINGS = {
     'TITLE': '华丽电器公开 API',

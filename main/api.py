@@ -15,9 +15,12 @@ from rest_framework.decorators import api_view
 from rest_framework.exceptions import APIException, NotFound, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import exception_handler
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema, extend_schema_field
 
-from main.content_utils import ContentStatus
+from main.content_utils import ContentStatus, VerificationStatus
+from company_content.api import faqs, locations, site_content
+from honors.api import honor_categories, honors
 from main.models import Lianxi, Xunpan
 from news.models import Article, NewsCategory
 from operations.attachments import AttachmentScanUnavailable, validate_and_scan_attachment
@@ -50,15 +53,41 @@ def normalize_model(value):
 
 
 def published_products():
+    filters = {"status": ContentStatus.PUBLISHED, "category__is_active": True}
+    if settings.SITE_CONTENT_MODE == "production":
+        filters.update(is_demo=False, verification_status=VerificationStatus.VERIFIED)
     return (
-        Product.objects.filter(status=ContentStatus.PUBLISHED, category__is_active=True)
+        Product.objects.filter(**filters)
         .select_related("category")
         .prefetch_related("specifications", "highlights", "applications", "gallery", "documents", "related_products")
     )
 
 
 def published_articles():
-    return Article.objects.filter(status=ContentStatus.PUBLISHED, category__is_active=True).select_related("category")
+    filters = {"status": ContentStatus.PUBLISHED, "category__is_active": True}
+    if settings.SITE_CONTENT_MODE == "production":
+        filters.update(is_demo=False, verification_status=VerificationStatus.VERIFIED)
+    return Article.objects.filter(**filters).select_related("category")
+
+
+def public_product_filter(prefix=""):
+    filters = {f"{prefix}status": ContentStatus.PUBLISHED}
+    if settings.SITE_CONTENT_MODE == "production":
+        filters.update({
+            f"{prefix}is_demo": False,
+            f"{prefix}verification_status": VerificationStatus.VERIFIED,
+        })
+    return filters
+
+
+def public_article_filter(prefix=""):
+    filters = {f"{prefix}status": ContentStatus.PUBLISHED}
+    if settings.SITE_CONTENT_MODE == "production":
+        filters.update({
+            f"{prefix}is_demo": False,
+            f"{prefix}verification_status": VerificationStatus.VERIFIED,
+        })
+    return filters
 
 
 def error_response(code, message, status_code, errors=None):
@@ -145,7 +174,8 @@ class ProductCategorySerializer(serializers.ModelSerializer):
         model = ProductCategory
         fields = ("name", "slug", "description", "image", "item_count")
 
-    def get_image(self, obj):
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_image(self, obj) -> str:
         return absolute_media_url(self.context["request"], obj.image_thumb or obj.image_web or obj.image)
 
 
@@ -159,13 +189,14 @@ class ProductCardSerializer(serializers.ModelSerializer):
         model = Product
         fields = (
             "name", "model", "level", "summary", "category", "category_slug",
-            "image", "homepage_badge", "specs",
+            "image", "homepage_badge", "specs", "is_demo", "verification_status",
         )
 
-    def get_image(self, obj):
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_image(self, obj) -> str:
         return absolute_media_url(self.context["request"], obj.image_thumb or obj.image_web or obj.image)
 
-    def get_specs(self, obj):
+    def get_specs(self, obj) -> list[dict]:
         return [
             {"name": item.name, "value": item.value}
             for item in obj.specifications.all()
@@ -190,10 +221,10 @@ class ProductDetailSerializer(ProductCardSerializer):
             "applications", "documents", "related_products", "seo",
         )
 
-    def get_image_web(self, obj):
+    def get_image_web(self, obj) -> str:
         return absolute_media_url(self.context["request"], obj.image_web or obj.image)
 
-    def get_gallery(self, obj):
+    def get_gallery(self, obj) -> list[dict]:
         images = [
             {
                 "image": absolute_media_url(self.context["request"], obj.image_web or obj.image),
@@ -210,24 +241,26 @@ class ProductDetailSerializer(ProductCardSerializer):
         } for item in obj.gallery.all())
         return images
 
-    def get_specifications(self, obj):
+    def get_specifications(self, obj) -> list[dict]:
         return [{"name": item.name, "value": item.value, "show_on_card": item.show_on_card} for item in obj.specifications.all()]
 
-    def get_highlights(self, obj):
+    def get_highlights(self, obj) -> list[dict]:
         return [{"title": item.title, "description": item.description} for item in obj.highlights.all()]
 
-    def get_applications(self, obj):
+    def get_applications(self, obj) -> list[dict]:
         return [{"name": item.name, "description": item.description} for item in obj.applications.all()]
 
-    def get_documents(self, obj):
+    def get_documents(self, obj) -> list[dict]:
         return [{
             "name": item.name,
             "type": item.document_type,
             "language": item.language,
             "file": absolute_media_url(self.context["request"], item.file),
+            "is_demo": item.is_demo,
+            "disclaimer": item.disclaimer,
         } for item in obj.documents.all()]
 
-    def get_related_products(self, obj):
+    def get_related_products(self, obj) -> list[dict]:
         manual_ids = list(obj.related_products.filter(status=ContentStatus.PUBLISHED, category__is_active=True).values_list("id", flat=True))
         related = list(published_products().filter(id__in=manual_ids).exclude(id=obj.id)[:3])
         if len(related) < 3:
@@ -240,7 +273,7 @@ class ProductDetailSerializer(ProductCardSerializer):
             ))
         return ProductCardSerializer(related, many=True, context=self.context).data
 
-    def get_seo(self, obj):
+    def get_seo(self, obj) -> dict:
         return {
             "title": obj.seo_title or f"{obj.name} {obj.model} - 华丽电器",
             "description": obj.seo_description or obj.summary,
@@ -255,10 +288,11 @@ class ProductOptionSerializer(serializers.ModelSerializer):
         model = Product
         fields = ("name", "model", "label", "image")
 
-    def get_label(self, obj):
+    def get_label(self, obj) -> str:
         return f"{obj.name}（{obj.model}）"
 
-    def get_image(self, obj):
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_image(self, obj) -> str:
         return absolute_media_url(self.context["request"], obj.image_thumb or obj.image_web or obj.image)
 
 
@@ -278,12 +312,15 @@ class NewsCardSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Article
-        fields = ("title", "slug", "summary", "category", "category_slug", "source", "date", "image")
+        fields = (
+            "title", "slug", "summary", "category", "category_slug", "source", "date", "image",
+            "is_demo", "verification_status",
+        )
 
-    def get_image(self, obj):
+    def get_image(self, obj) -> str:
         return absolute_media_url(self.context["request"], obj.cover_thumb or obj.cover_web or obj.cover)
 
-    def get_date(self, obj):
+    def get_date(self, obj) -> str:
         return timezone.localtime(obj.published_at).date().isoformat() if obj.published_at else ""
 
 
@@ -296,10 +333,10 @@ class NewsDetailSerializer(NewsCardSerializer):
     class Meta(NewsCardSerializer.Meta):
         fields = NewsCardSerializer.Meta.fields + ("body", "cover", "related_news", "seo")
 
-    def get_cover(self, obj):
+    def get_cover(self, obj) -> str:
         return absolute_media_url(self.context["request"], obj.cover_web or obj.cover)
 
-    def get_related_news(self, obj):
+    def get_related_news(self, obj) -> list[dict]:
         related = list(
             published_articles()
             .filter(category=obj.category)
@@ -315,7 +352,7 @@ class NewsDetailSerializer(NewsCardSerializer):
             ))
         return NewsCardSerializer(related, many=True, context=self.context).data
 
-    def get_seo(self, obj):
+    def get_seo(self, obj) -> dict:
         return {
             "title": obj.seo_title or f"{obj.title} - 华丽电器",
             "description": obj.seo_description or obj.summary,
@@ -334,7 +371,7 @@ class InquirySerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         model = attrs.get("product_model_snapshot")
         if model:
-            product = Product.objects.filter(model=model, status=ContentStatus.PUBLISHED, category__is_active=True).first()
+            product = published_products().filter(model=model).first()
             if product:
                 attrs["product"] = product
                 attrs["product_name_snapshot"] = product.name
@@ -358,19 +395,19 @@ def validate_filters(request, categories):
     return category, q
 
 
-@extend_schema(operation_id="product_categories_list")
+@extend_schema(operation_id="product_categories_list", responses=ProductCategorySerializer(many=True))
 @api_view(["GET"])
 def product_categories(request):
+    public_filter = public_product_filter("products__")
     queryset = (
         ProductCategory.objects.filter(is_active=True)
-        .annotate(item_count=Count("products", filter=Q(products__status=ContentStatus.PUBLISHED)))
+        .annotate(item_count=Count("products", filter=Q(**public_filter)))
         .filter(item_count__gt=0)
         .order_by("sort_order", "id")
     )
     return Response(ProductCategorySerializer(queryset, many=True, context={"request": request}).data)
 
 
-@extend_schema(operation_id="products_list")
 @extend_schema(operation_id="products_list", responses=ProductCardSerializer(many=True))
 @api_view(["GET"])
 def product_list(request):
@@ -388,7 +425,7 @@ def product_list(request):
     return paginator.response(request, data)
 
 
-@extend_schema(operation_id="product_detail")
+@extend_schema(operation_id="product_detail", responses=ProductDetailSerializer)
 @api_view(["GET"])
 def product_detail(request, model):
     normalized = normalize_model(model)
@@ -398,26 +435,26 @@ def product_detail(request, model):
     return Response(ProductDetailSerializer(product, context={"request": request}).data)
 
 
-@extend_schema(operation_id="product_options_list")
+@extend_schema(operation_id="product_options_list", responses=ProductOptionSerializer(many=True))
 @api_view(["GET"])
 def product_options(request):
     queryset = published_products().order_by("category__sort_order", "sort_order", "id")
     return Response(ProductOptionSerializer(queryset, many=True, context={"request": request}).data)
 
 
-@extend_schema(operation_id="news_categories_list")
+@extend_schema(operation_id="news_categories_list", responses=NewsCategorySerializer(many=True))
 @api_view(["GET"])
 def news_categories(request):
+    public_filter = public_article_filter("articles__")
     queryset = (
         NewsCategory.objects.filter(is_active=True)
-        .annotate(item_count=Count("articles", filter=Q(articles__status=ContentStatus.PUBLISHED)))
+        .annotate(item_count=Count("articles", filter=Q(**public_filter)))
         .filter(item_count__gt=0)
         .order_by("sort_order", "id")
     )
     return Response(NewsCategorySerializer(queryset, many=True).data)
 
 
-@extend_schema(operation_id="news_list")
 @extend_schema(operation_id="news_list", responses=NewsCardSerializer(many=True))
 @api_view(["GET"])
 def news_list(request):
@@ -434,7 +471,7 @@ def news_list(request):
     return paginator.response(request, data)
 
 
-@extend_schema(operation_id="news_detail")
+@extend_schema(operation_id="news_detail", responses=NewsDetailSerializer)
 @api_view(["GET"])
 def news_detail(request, slug):
     article = published_articles().filter(slug=slug).first()
@@ -443,6 +480,7 @@ def news_detail(request, slug):
     return Response(NewsDetailSerializer(article, context={"request": request}).data)
 
 
+@extend_schema(operation_id="homepage_retrieve", responses=OpenApiTypes.OBJECT)
 @api_view(["GET"])
 def homepage(request):
     product_query = published_products().order_by("is_featured", "featured_order", "sort_order", "id")
@@ -496,6 +534,7 @@ def rate_limit_or_raise(model, fingerprint, *, minutes, limit):
     )
 
 
+@extend_schema(operation_id="forms_bootstrap", responses=OpenApiTypes.OBJECT)
 @ensure_csrf_cookie
 @api_view(["GET"])
 def forms_bootstrap(request):
@@ -514,6 +553,7 @@ def forms_bootstrap(request):
     })
 
 
+@extend_schema(operation_id="captcha_create", request=None, responses=OpenApiTypes.OBJECT)
 @api_view(["POST"])
 def captcha(request):
     challenge, image = create_captcha(request)
@@ -524,6 +564,7 @@ def captcha(request):
     }, status=201)
 
 
+@extend_schema(operation_id="privacy_policy_retrieve", responses=OpenApiTypes.OBJECT)
 @api_view(["GET"])
 def privacy_policy(request):
     policy = current_privacy_policy()
@@ -539,6 +580,7 @@ def privacy_policy(request):
     })
 
 
+@extend_schema(operation_id="health_retrieve", responses=OpenApiTypes.OBJECT)
 @api_view(["GET"])
 def health(request):
     service_status = public_health_status()
@@ -602,12 +644,14 @@ def secure_form_submit(request, *, kind, serializer_class, model, minutes, limit
     return Response({"id": lead.pk, "message": "询盘提交成功。" if kind == "inquiry" else "留言提交成功。"}, status=201)
 
 
+@extend_schema(operation_id="inquiries_create", request=InquirySerializer, responses=OpenApiTypes.OBJECT)
 @csrf_protect
 @api_view(["POST"])
 def inquiries(request):
     return secure_form_submit(request, kind="inquiry", serializer_class=InquirySerializer, model=Xunpan, minutes=30, limit=3)
 
 
+@extend_schema(operation_id="contacts_create", request=ContactSerializer, responses=OpenApiTypes.OBJECT)
 @csrf_protect
 @api_view(["POST"])
 def contacts(request):
@@ -628,6 +672,11 @@ urlpatterns = [
     path("captcha/", captcha, name="captcha"),
     path("privacy-policy/", privacy_policy, name="privacy-policy"),
     path("health/", health, name="health"),
+    path("site-content/", site_content, name="site-content"),
+    path("locations/", locations, name="locations"),
+    path("faqs/", faqs, name="faqs"),
+    path("honor-categories/", honor_categories, name="honor-categories"),
+    path("honors/", honors, name="honors"),
     path("product-categories/", product_categories, name="product-categories"),
     path("products/", product_list, name="products"),
     path("products/<str:model>/", product_detail, name="product-detail"),

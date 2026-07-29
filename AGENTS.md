@@ -1,6 +1,6 @@
 ﻿# 华丽电器制造有限公司 — 企业官网开发手册
 
-> **版本**：v1.29 · **最后更新**：2026-07-28
+> **版本**：v1.30 · **最后更新**：2026-07-29
 > **开发者**：本项目为前后端分离架构，AI 辅助开发
 
 > **文档维护约定**：每次完成会改变项目结构、功能状态、接口、数据模型、运行方式或待办事项的开发工作后，必须同步更新本文件。
@@ -150,7 +150,11 @@ D:\13486\Desktop\企业网站\
 │
 ├── products/                  # ===== 产品模型、后台、API 与种子命令 =====
 ├── news/                      # ===== 新闻模型、后台与 API =====
+├── company_content/           # ===== 企业资料、事实、历程、供应链、地点与 FAQ =====
+├── honors/                    # ===== 荣誉分类、荣誉条目与公开 API =====
+├── page_builder/              # ===== 统一媒体库、许可台账、素材槽位与引用关系 =====
 ├── operations/                # ===== 安全、隐私、邮件、审计、预渲染、备份与健康看板 =====
+├── docs/                      # ===== 中文操作手册 =====
 ├── deploy/                    # ===== Ubuntu、Nginx、Gunicorn 与 systemd 部署文件 =====
 ├── .github/workflows/ci.yml   # ===== GitHub Actions 持续集成 =====
 ├── private_media/             # ===== 私有询盘/邮件附件（禁止公开访问） =====
@@ -313,7 +317,7 @@ axios.post('/api/contacts/', messageData)
 
 ### 7.1 settings.py 关键配置
 
-**已注册应用：** simpleui、DRF、drf-spectacular、products、news、main 及 Django 内置应用。
+**已注册应用：** simpleui、DRF、drf-spectacular、products、news、company_content、honors、page_builder、main、operations 及 Django 内置应用。
 
 **国际化：** LANGUAGE_CODE = 'zh-hans'，TIME_ZONE = 'Asia/Shanghai'
 
@@ -331,7 +335,11 @@ axios.post('/api/contacts/', messageData)
 
 ### 7.2 内容运营应用与公开 API
 
-`products/` 和 `news/` 已建立独立内容模型、后台管理、媒体处理与幂等种子命令。当前数据库已导入 18 款产品和 9 条新闻，前台产品、新闻、首页聚合、产品选项均从 SQLite API 获取。
+`products/` 和 `news/` 已建立独立内容模型、后台管理、媒体处理与幂等种子命令。当前数据库包含 18 款原有产品、12 款 `DEMO-` 概念产品、9 条原有新闻和 12 条制造知识测试新闻；前台产品、新闻、首页聚合、产品选项均从 SQLite API 获取。
+
+第三阶段里程碑一新增 `company_content/`、`honors/` 和 `page_builder/`。后台现在可维护企业资料、事实指标、发展历程、供应链、经销商权益、地点、FAQ、荣誉、媒体文件夹、标签、许可台账、桌面/手机素材变体、焦点坐标、素材槽位和引用关系。产品后台增加标准参数字典与“参数映射建议”，建议必须由管理员确认后才会写入产品参数。
+
+`SITE_CONTENT_MODE=test|production` 控制内容可见性。默认 `test` 模式允许本地展示演示产品、AI 占位和待核验内容；`production` 模式只公开“非演示 + 已核验”的内容，并阻止演示或待核验内容发布。后台首页只读显示当前模式。
 
 公开 API 统一使用 `/api/v1/` 前缀：
 
@@ -345,6 +353,11 @@ axios.post('/api/contacts/', messageData)
 | GET | `/api/v1/news/` | 新闻列表、分类、搜索、分页 |
 | GET | `/api/v1/news/{slug}/` | 新闻详情和相关新闻 |
 | GET | `/api/v1/homepage/` | 首页推荐内容聚合 |
+| GET | `/api/v1/site-content/` | 企业资料、指标、历程、供应链、经销商权益和地点聚合 |
+| GET | `/api/v1/locations/` | 公开地点与联系方式 |
+| GET | `/api/v1/faqs/?category=` | FAQ 列表和分类筛选 |
+| GET | `/api/v1/honor-categories/` | 有公开条目的荣誉分类 |
+| GET | `/api/v1/honors/?category=` | 荣誉条目和分类筛选 |
 | POST | `/api/v1/inquiries/` | 新增在线询盘，保留产品名称/型号快照并自动关联有效产品 |
 | POST | `/api/v1/contacts/` | 新增联系我们留言 |
 
@@ -360,6 +373,8 @@ axios.post('/api/contacts/', messageData)
 在线表单必须经过隐私同意、一次性令牌、风险验证码、蜜罐和 IP 指纹限流。IP 只保存使用 `FORM_SECURITY_KEY` 生成的 HMAC 指纹，不保存明文。询盘附件保存到 `private_media/`，不能通过 `/media/` 直接访问，后台使用受控下载接口读取。Windows 开发环境记录为跳过 ClamAV；生产环境必须启用 ClamAV，扫描不可用时拒绝附件但允许移除附件后提交纯文本。
 
 开发环境额外提供 `/api/schema/`、`/api/docs/` 和 `/api/redoc/`。公开接口匿名限流为 120 次/分钟，产品每页 12 条、新闻每页 8 条。
+
+第三阶段基础种子命令导入 20 条测试 FAQ、8 条待核验荣誉、4 个演示产品系列、12 款 `DEMO-` 产品、12 条测试新闻、8 个标准参数、参数映射建议、媒体许可/标签/槽位，以及 4 份双语 4 页测试 PDF。所有演示内容均带演示标识或免责声明，不可作为真实采购、认证或经营依据。
 
 ### 7.3 创建新 API 流程
 
@@ -400,6 +415,8 @@ axios.post('/api/contacts/', messageData)
 |--------|-------------|------|
 | `xunpan` | `Xunpan` | 保存在线询盘、产品需求与附件路径 |
 | `lianxi` | `Lianxi` | 保存联系我们页面的留言 |
+
+第三阶段结构化内容表由 Django 自动命名，主要包括 `company_content_*`、`honors_*`、`page_builder_*`，以及产品应用中的标准参数、参数映射建议和演示标记字段。`operations_jobtask` 是 AI 翻译、生图、索引、统计和页面发布后续共用的数据库任务中心。
 
 `xunpan` 额外保存 `product_name_snapshot`、`product_model_snapshot` 和可选的产品外键，确保客户提交询盘后产品名称、型号不会因后台改名而丢失；询盘产品选项接口同时返回产品缩略图，前端选择产品后显示名称、型号和图片。`xunpan`、`lianxi` 均保存处理状态、负责人、内部备注和最后跟进时间。迁移和种子命令均不会清空既有表单记录。
 
@@ -442,6 +459,9 @@ axios.post('/api/contacts/', messageData)
 | `python manage.py seed_content` | 幂等导入产品、新闻及媒体内容 |
 | `python manage.py seed_content --check` | 只检查种子与数据库差异，不写入 |
 | `python manage.py seed_content --overwrite` | 允许覆盖已有内容后重新导入 |
+| `python manage.py seed_phase3_foundation` | 幂等导入第三阶段公司内容、荣誉、FAQ、演示产品/新闻、媒体基础和 4 份测试 PDF |
+| `python manage.py seed_phase3_foundation --check` | 只检查第三阶段种子差异，不写数据库 |
+| `python manage.py seed_phase3_foundation --overwrite` | 恢复种子管理的演示内容；不会重置人工已核验的真实产品/新闻 |
 | `python manage.py process_email_queue` | 处理到期邮件任务并执行失败重试 |
 | `python manage.py reset_superuser_2fa 用户名` | 在服务器重置超级管理员双重验证 |
 | `python manage.py list_prerender_routes` | 输出全部可索引页面路由 |
@@ -483,6 +503,7 @@ axios.post('/api/contacts/', messageData)
 | 表单显示提交失败 | Django 后端未启动 | 启动 `python manage.py runserver` 并确认 8000 端口可用 |
 | 产品、新闻大量显示加载失败 | 8000 端口运行的是旧 Django 进程，新增 `/api/v1/` 路由返回 404 | 重启当前项目的 Django 服务，再访问 `http://localhost:8000/api/v1/homepage/` 确认返回 200 |
 | Navicat 看不到新记录 | 数据表未刷新 | 右键 `xunpan` 或 `lianxi` 后选择刷新 |
+| 切换生产模式后演示内容消失 | `SITE_CONTENT_MODE=production` 会隐藏演示和待核验内容 | 本地测试使用 `test`；正式内容需完成来源和核验后再发布 |
 
 ### 9.2 开发约定
 
@@ -511,6 +532,8 @@ axios.post('/api/contacts/', messageData)
 - 账号安全页面为 `/admin/security/security-center/`，展示 TOTP 设备、Axes 登录失败记录和安全登录记录
 - 账号安全页面同时兼容 `/admin/security-center/security-center/`，用于 SimpleUI iframe 菜单跳转
 - Quill 2.0.3 当前存在两个上游 low severity XSS 告警；项目仍使用 Bleach 白名单二次清洗，暂不强制降级以避免破坏表格插件
+- `DEMO-` 产品、测试新闻、测试 FAQ、演示指标和测试 PDF 只用于本地验收；不得删除演示标识或把内容当作真实公司事实
+- 媒体素材通过审核前必须登记许可；未知许可或不允许商业使用的素材不能通过后台审核
 
 ### 9.4 第二阶段验收结果
 
@@ -520,7 +543,17 @@ axios.post('/api/contacts/', messageData)
 - SQLite 加密备份与临时目录恢复演练通过，业务数据保持为 1 条询盘、0 条联系留言、18 款产品和 9 条新闻
 - 本地 Git 仓库已初始化，敏感文件和运行数据均已忽略；远端已关联 GitHub `origin/main`，公网部署仍等待域名和服务器
 
-### 9.5 后续开发方向
+### 9.5 第三阶段里程碑一验收结果
+
+- 已完成公司内容、荣誉管理、页面设计三个后台应用，以及通用数据库任务中心
+- 数据库现有 30 款产品（12 款演示）、21 条新闻（12 条演示）、20 条 FAQ、8 条待核验荣誉和 4 份双语测试 PDF
+- 8 个标准参数已建立，现有参数只生成待人工确认的映射建议，不自动改写产品参数
+- `SITE_CONTENT_MODE`、生产发布拦截、素材许可校验、桌面/手机媒体变体和内容核验日期已完成
+- 迁移前创建两份 AES-256 加密备份，迁移与种子导入保持 1 条询盘、0 条联系留言不变
+- Django 全量 50 项测试、迁移检查、系统检查、OpenAPI 校验和 Vue 生产构建通过；PDF 已完成 4 页文本与视觉检查
+- 里程碑二“完整中英文内容系统”尚未开始，必须等待用户浏览器验收后继续
+
+### 9.6 后续开发方向
 
 - [x] 在线询盘与联系留言接入 SQLite 和 Django API
 - [x] 后台增加表单管理一级菜单及联系/询盘二级菜单
@@ -546,6 +579,11 @@ axios.post('/api/contacts/', messageData)
 - [x] 后台支持选中询盘/留言导出 UTF-8 CSV 和 Excel
 - [x] 询盘自动关联有效产品并在前端显示产品名称、型号和缩略图
 - [ ] 集成中英文双语切换功能
+- [x] 第三阶段里程碑一：结构化公司内容、荣誉、FAQ、标准参数、统一媒体库、任务中心和演示数据
+- [ ] 第三阶段里程碑二：独立翻译表、术语库、AI 翻译队列、英文路由和语言切换
+- [ ] 第三阶段里程碑三：GrapesJS 搭建器、全站视觉原型、AI 图片、动画和 3D
+- [ ] 第三阶段里程碑四：搜索、对比、资料申请、高德地图和业务联动
+- [ ] 第三阶段里程碑五：匿名统计、数据看板、双语预渲染和整体验收
 - [ ] 接入高德/百度地图
 - [x] 表单增加 CSRF、一次性令牌、隐私同意、风险验证码、蜜罐、限流和 IP HMAC 指纹
 - [x] 询盘附件迁移为私有存储并增加文件签名、结构、图片解码与 ClamAV 扫描

@@ -16,6 +16,37 @@ class ContentStatus(models.TextChoices):
     ARCHIVED = "archived", "归档"
 
 
+class VerificationStatus(models.TextChoices):
+    PENDING = "pending", "待核验"
+    VERIFIED = "verified", "已核验"
+    REJECTED = "rejected", "已拒绝"
+
+
+def public_content_allowed(*, is_demo=False, verification_status=VerificationStatus.PENDING):
+    """测试模式可展示演示内容，生产模式只展示已核验的真实内容。"""
+    from django.conf import settings
+
+    if getattr(settings, "SITE_CONTENT_MODE", "test") == "test":
+        return True
+    return not is_demo and verification_status == VerificationStatus.VERIFIED
+
+
+def validate_production_publish(*, status, is_demo, verification_status):
+    from django.conf import settings
+
+    if getattr(settings, "SITE_CONTENT_MODE", "test") != "production":
+        return
+    if status != ContentStatus.PUBLISHED:
+        return
+    errors = []
+    if is_demo:
+        errors.append("生产模式不能发布演示内容。")
+    if verification_status != VerificationStatus.VERIFIED:
+        errors.append("生产模式只能发布已核验内容。")
+    if errors:
+        raise ValidationError(" ".join(errors))
+
+
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 ALLOWED_IMAGE_FORMATS = {"JPEG", "PNG", "WEBP"}
 MAX_IMAGE_SIZE = 5 * 1024 * 1024

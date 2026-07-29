@@ -1,13 +1,15 @@
+from django.conf import settings
 from django.contrib import admin
 from django.contrib.admin import helpers
 from django.http import HttpResponseRedirect
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.html import format_html
 
 from .models import (
     AuditLog, BackupRecord, CaptchaChallenge, EmailAttachment, EmailTask,
     EmailTemplate, FormToken, PrerenderTask, PrivacyPolicy, RecoveryCode,
-    SystemAlert, TaskRun,
+    JobTask, SystemAlert, TaskRun,
 )
 from .health import health_snapshot
 from .signals import DEFAULT_TEMPLATES
@@ -22,6 +24,7 @@ def operations_index(request, extra_context=None):
     context = dict(extra_context or {})
     context["health_snapshot"] = health_snapshot()
     context["two_factor_setup_url"] = reverse("operations:two-factor-setup")
+    context["site_content_mode"] = settings.SITE_CONTENT_MODE
     return original_index(request, context)
 
 
@@ -177,6 +180,46 @@ class TaskRunAdmin(DefaultDateRangeAdminMixin, ReadOnlyAdmin):
     list_display = ("kind", "status", "summary", "started_at", "finished_at")
     list_filter = ("kind", "status", "started_at")
     readonly_fields = tuple(field.name for field in TaskRun._meta.fields)
+
+
+@admin.register(JobTask)
+class JobTaskAdmin(DefaultDateRangeAdminMixin, admin.ModelAdmin):
+    date_range_field = "created_at"
+    list_display = ("title", "kind", "status", "progress_display", "attempts", "created_by", "created_at")
+    list_filter = ("kind", "status", "created_at")
+    search_fields = ("title", "kind", "last_error")
+    readonly_fields = (
+        "kind", "title", "payload", "result", "progress_current", "progress_total",
+        "attempts", "max_attempts", "next_attempt_at", "last_error", "created_by",
+        "created_at", "started_at", "finished_at",
+    )
+    actions = ("pause_selected", "resume_selected", "cancel_selected", "retry_selected")
+
+    @admin.display(description="进度")
+    def progress_display(self, obj):
+        return f"{obj.progress_current}/{obj.progress_total}" if obj.progress_total else "-"
+
+    @admin.action(description="暂停所选等待中任务")
+    def pause_selected(self, request, queryset):
+        count = queryset.filter(status=JobTask.Status.PENDING).update(status=JobTask.Status.PAUSED)
+        self.message_user(request, f"已暂停 {count} 个任务。")
+
+    @admin.action(description="恢复所选暂停任务")
+    def resume_selected(self, request, queryset):
+        count = queryset.filter(status=JobTask.Status.PAUSED).update(status=JobTask.Status.PENDING)
+        self.message_user(request, f"已恢复 {count} 个任务。")
+
+    @admin.action(description="取消所选未完成任务")
+    def cancel_selected(self, request, queryset):
+        count = queryset.filter(status__in=(JobTask.Status.PENDING, JobTask.Status.PAUSED)).update(status=JobTask.Status.CANCELLED)
+        self.message_user(request, f"已取消 {count} 个任务。")
+
+    @admin.action(description="重试所选失败任务")
+    def retry_selected(self, request, queryset):
+        count = queryset.filter(status=JobTask.Status.FAILED).update(
+            status=JobTask.Status.PENDING, attempts=0, last_error="", next_attempt_at=timezone.now(),
+        )
+        self.message_user(request, f"已重新排队 {count} 个任务。")
 
 
 @admin.register(SystemAlert)

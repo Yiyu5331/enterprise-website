@@ -15,7 +15,7 @@ def sync_content_editor_permissions(sender, **kwargs):
 
     group, _ = Group.objects.get_or_create(name="内容编辑")
     permissions = Permission.objects.filter(
-        content_type__app_label__in=("products", "news"),
+        content_type__app_label__in=("products", "news", "company_content", "honors", "page_builder"),
         codename__regex=r"^(add|change|view)_",
     )
     group.permissions.set(permissions)

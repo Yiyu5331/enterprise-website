@@ -41,8 +41,11 @@ class NewsCategoryAdmin(admin.ModelAdmin):
 class ArticleAdmin(DefaultDateRangeAdminMixin, admin.ModelAdmin):
     date_range_field = "published_at"
     form = ArticleAdminForm
-    list_display = ("cover_preview", "title", "category", "status", "is_featured", "source", "published_at", "updated_at", "edit_link")
-    list_filter = ("status", "category", "is_featured", "source", "published_at")
+    list_display = (
+        "cover_preview", "title", "category", "status", "is_demo", "verification_status",
+        "is_featured", "source", "published_at", "updated_at", "edit_link",
+    )
+    list_filter = ("status", "verification_status", "is_demo", "category", "is_featured", "source", "published_at")
     search_fields = ("title", "summary", "source", "body_text")
     readonly_fields = ("cover_preview_large", "cover_web", "cover_thumb", "first_published_at", "created_by_display", "updated_by_display", "created_at", "updated_at")
     list_per_page = 20
@@ -50,6 +53,7 @@ class ArticleAdmin(DefaultDateRangeAdminMixin, admin.ModelAdmin):
     fieldsets = (
         ("基本信息", {"fields": ("category", "title", "slug", "summary", "source", "body")}),
         ("封面与焦点", {"fields": ("cover", "cover_alt", "cover_preview_large", "focal_x", "focal_y")}),
+        ("测试与核验", {"fields": ("is_demo", "verification_status", "source_url", "verified_at")}),
         ("发布与推荐", {"fields": ("status", "published_at", "is_featured", "featured_order")}),
         ("SEO", {"fields": ("seo_title", "seo_description")}),
         ("记录信息", {"fields": ("first_published_at", "created_by_display", "updated_by_display", "created_at", "updated_at"), "classes": ("collapse",)}),

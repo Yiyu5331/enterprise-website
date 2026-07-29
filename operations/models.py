@@ -187,6 +187,41 @@ class TaskRun(models.Model):
         ordering = ("-started_at",)
 
 
+class JobTask(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "等待处理"
+        RUNNING = "running", "处理中"
+        PAUSED = "paused", "已暂停"
+        SUCCESS = "success", "已完成"
+        FAILED = "failed", "失败"
+        CANCELLED = "cancelled", "已取消"
+
+    kind = models.CharField("任务类型", max_length=50, db_index=True)
+    status = models.CharField("状态", max_length=20, choices=Status.choices, default=Status.PENDING, db_index=True)
+    title = models.CharField("任务名称", max_length=200)
+    payload = models.JSONField("任务参数", default=dict, blank=True)
+    result = models.JSONField("任务结果", default=dict, blank=True)
+    progress_current = models.PositiveIntegerField("当前进度", default=0)
+    progress_total = models.PositiveIntegerField("总进度", default=0)
+    attempts = models.PositiveSmallIntegerField("尝试次数", default=0)
+    max_attempts = models.PositiveSmallIntegerField("最大尝试次数", default=3)
+    next_attempt_at = models.DateTimeField("下次执行时间", default=timezone.now, db_index=True)
+    last_error = models.CharField("错误摘要", max_length=500, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+    started_at = models.DateTimeField("开始时间", null=True, blank=True)
+    finished_at = models.DateTimeField("结束时间", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "通用任务"
+        verbose_name_plural = "通用任务中心"
+        ordering = ("-created_at",)
+        indexes = [models.Index(fields=("status", "next_attempt_at"))]
+
+    def __str__(self):
+        return self.title
+
+
 class SystemAlert(models.Model):
     level = models.CharField("级别", max_length=20, default="error")
     source = models.CharField("来源", max_length=50, db_index=True)

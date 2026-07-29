@@ -4,11 +4,13 @@ from django.db import models
 
 from main.content_utils import (
     ContentStatus,
+    VerificationStatus,
     delete_field_file,
     process_uploaded_image,
     rich_text_images_have_alt,
     rich_text_to_plain,
     sanitize_rich_text,
+    validate_production_publish,
     validate_image_upload,
 )
 
@@ -71,6 +73,13 @@ class Article(models.Model):
     first_published_at = models.DateTimeField("首次发布时间", null=True, blank=True, editable=False)
     status = models.CharField("状态", max_length=20, choices=ContentStatus.choices, default=ContentStatus.DRAFT)
     is_featured = models.BooleanField("首页推荐", default=False)
+    is_demo = models.BooleanField("演示新闻", default=False, db_index=True)
+    verification_status = models.CharField(
+        "核验状态", max_length=20, choices=VerificationStatus.choices,
+        default=VerificationStatus.PENDING, db_index=True,
+    )
+    source_url = models.URLField("来源网址", blank=True)
+    verified_at = models.DateTimeField("核验时间", null=True, blank=True)
     featured_order = models.PositiveIntegerField("推荐排序", default=0)
     seo_title = models.CharField("SEO 标题", max_length=160, blank=True)
     seo_description = models.CharField("SEO 描述", max_length=300, blank=True)
@@ -104,6 +113,10 @@ class Article(models.Model):
         ]
 
     def clean(self):
+        validate_production_publish(
+            status=self.status, is_demo=self.is_demo,
+            verification_status=self.verification_status,
+        )
         if self.pk:
             old = type(self).objects.filter(pk=self.pk).values("slug", "first_published_at").first()
             if old and old["first_published_at"] and old["slug"] != self.slug:
@@ -124,6 +137,12 @@ class Article(models.Model):
                 raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
+        if self.verification_status == VerificationStatus.VERIFIED and not self.verified_at:
+            self.verified_at = timezone.now()
+        elif self.verification_status != VerificationStatus.VERIFIED:
+            self.verified_at = None
+        if kwargs.get("update_fields") is not None and "verification_status" in kwargs["update_fields"]:
+            kwargs["update_fields"] = set(kwargs["update_fields"]) | {"verified_at"}
         self.body = sanitize_rich_text(self.body)
         self.body_text = rich_text_to_plain(self.body)
         if not self.summary:

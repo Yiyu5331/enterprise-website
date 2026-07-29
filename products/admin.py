@@ -23,6 +23,9 @@ from .models import (
     ProductHighlight,
     ProductSpecification,
     ProductTag,
+    ParameterMappingSuggestion,
+    StandardParameter,
+    StandardParameterOption,
 )
 
 
@@ -39,6 +42,7 @@ class ProductGalleryInline(SortableInline):
 class ProductSpecificationInline(SortableInline):
     model = ProductSpecification
     formset = SpecificationInlineFormSet
+    fields = ("name", "value", "standard_parameter", "normalized_number", "normalized_text", "show_on_card", "sort_order")
 
 
 class ProductHighlightInline(SortableInline):
@@ -124,10 +128,10 @@ class ProductAdmin(DefaultDateRangeAdminMixin, admin.ModelAdmin):
     )
     list_display = (
         "image_preview", "name", "model", "category", "level", "status",
-        "is_featured", "sort_order", "gallery_count", "document_count",
+        "is_demo", "verification_status", "is_featured", "sort_order", "gallery_count", "document_count",
         "first_published_at", "created_at", "updated_at", "edit_link",
     )
-    list_filter = ("status", "category", "is_featured", "tags", "level", "updated_at")
+    list_filter = ("status", "verification_status", "is_demo", "category", "is_featured", "tags", "level", "updated_at")
     search_fields = ("name", "model", "summary", "search_text")
     filter_horizontal = ("tags", "related_products")
     readonly_fields = (
@@ -139,6 +143,7 @@ class ProductAdmin(DefaultDateRangeAdminMixin, admin.ModelAdmin):
     fieldsets = (
         ("基本信息", {"fields": ("category", "tags", "name", "model", "level", "summary", "description")}),
         ("主图与焦点", {"fields": ("image", "image_preview_large", "focal_x", "focal_y")}),
+        ("测试与核验", {"fields": ("is_demo", "verification_status", "source_name", "source_url", "verified_at")}),
         ("发布与推荐", {"fields": ("status", "sort_order", "is_featured", "featured_order", "homepage_badge", "related_products")}),
         ("SEO", {"fields": ("seo_title", "seo_description")}),
         ("记录信息", {"fields": ("first_published_at", "created_by_display", "updated_by_display", "created_at", "updated_at"), "classes": ("collapse",)}),
@@ -252,3 +257,56 @@ class ProductAdmin(DefaultDateRangeAdminMixin, admin.ModelAdmin):
     @admin.action(description="取消首页推荐")
     def unfeature_selected(self, request, queryset):
         queryset.update(is_featured=False)
+
+
+class StandardParameterOptionInline(admin.TabularInline):
+    model = StandardParameterOption
+    extra = 0
+
+
+@admin.register(StandardParameter)
+class StandardParameterAdmin(admin.ModelAdmin):
+    list_display = ("name_zh", "name_en", "slug", "value_type", "standard_unit", "sort_order", "is_active")
+    list_filter = ("value_type", "is_active")
+    search_fields = ("name_zh", "name_en", "slug", "aliases_zh", "aliases_en")
+    list_editable = ("sort_order", "is_active")
+    inlines = (StandardParameterOptionInline,)
+
+
+@admin.register(ParameterMappingSuggestion)
+class ParameterMappingSuggestionAdmin(admin.ModelAdmin):
+    list_display = (
+        "source_name", "suggested_parameter", "confidence", "affected_count",
+        "status", "reviewed_by", "reviewed_at",
+    )
+    list_filter = ("status", "suggested_parameter")
+    search_fields = ("source_name", "matched_alias", "suggested_parameter__name_zh")
+    readonly_fields = (
+        "source_name", "suggested_parameter", "matched_alias", "confidence",
+        "affected_count", "reviewed_by", "reviewed_at", "created_at", "updated_at",
+    )
+    actions = ("accept_selected", "reject_selected")
+
+    @admin.action(description="接受建议并映射同名参数")
+    def accept_selected(self, request, queryset):
+        count = 0
+        for suggestion in queryset.select_related("suggested_parameter"):
+            ProductSpecification.objects.filter(
+                name=suggestion.source_name,
+                standard_parameter__isnull=True,
+            ).update(standard_parameter=suggestion.suggested_parameter)
+            suggestion.status = ParameterMappingSuggestion.Status.ACCEPTED
+            suggestion.reviewed_by = request.user
+            suggestion.reviewed_at = timezone.now()
+            suggestion.save(update_fields=("status", "reviewed_by", "reviewed_at", "updated_at"))
+            count += 1
+        self.message_user(request, f"已接受 {count} 条参数映射建议。")
+
+    @admin.action(description="拒绝所选映射建议")
+    def reject_selected(self, request, queryset):
+        count = queryset.update(
+            status=ParameterMappingSuggestion.Status.REJECTED,
+            reviewed_by=request.user,
+            reviewed_at=timezone.now(),
+        )
+        self.message_user(request, f"已拒绝 {count} 条参数映射建议。")

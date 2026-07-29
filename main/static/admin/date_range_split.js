@@ -7,7 +7,13 @@
 
     function queryDate(value, isEnd) {
         if (!value) return "";
-        return value + (isEnd ? " 23:59:59" : " 00:00:00");
+        var suffix = isEnd ? "T23:59:59" : "T00:00:00";
+        var date = new Date(value + suffix);
+        var offset = -date.getTimezoneOffset();
+        var sign = offset >= 0 ? "+" : "-";
+        var hours = String(Math.floor(Math.abs(offset) / 60)).padStart(2, "0");
+        var minutes = String(Math.abs(offset) % 60).padStart(2, "0");
+        return value + suffix + sign + hours + ":" + minutes;
     }
 
     function createDateInput(label, value) {
